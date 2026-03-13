@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dongyun Lu — terminal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="screen" aria-label="terminal screen">
+      <div class="terminal" aria-label="terminal">
+        <div class="terminal__body" id="terminalBody">
+          <div class="line">
+            <span class="glow">Hey, I am Dongyun Lu (陸東韻/リク トウイン). Welcome to my personal page.</span>
+          </div>
+          <div class="line">
+            <span class="glow">I committed myself to being an observer.</span>
+          </div>
+          <div class="line">
+            <span class="glow">Still, I struggle not to be consumed.</span>
+          </div>
+          <div class="line">
+            <span class="glow">And in the end, I am still learning how to be a human.</span>
+          </div>
+          <div class="line">
+            <span class="glow">&nbsp;</span>
+          </div>
+          <div class="line">
+            <span class="glow">Discover who I am via:</span>
+          </div>
+          <div class="line muted">
+            Type <span class="glow">cv</span> to see the CV.
+          </div>
+          <div class="line muted">
+            Type <span class="glow">writings</span> to check out my observations.
+          </div>
+          <div class="line muted">
+            Type <span class="glow">publications</span> to see my works in academia.
+          </div>
+        </div>
+
+        <form class="terminal__prompt" id="promptForm" autocomplete="off">
+          <span class="prompt__left">
+            <span class="prompt__brand">RK::</span>
+            <span id="promptPath" class="prompt__path">base</span>
+            <span class="prompt__sep"> › </span>
+            <span class="prompt__dollar">&gt;</span>
+          </span>
+          <label class="sr-only" for="cmd">command input</label>
+          <input
+            id="cmd"
+            class="prompt__input"
+            inputmode="text"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="type..."
+          />
+        </form>
+      </div>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
