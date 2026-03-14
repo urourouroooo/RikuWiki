@@ -22,7 +22,7 @@
   const printLine = (text, cls) => {
     const div = document.createElement("div");
     div.className = `line${cls ? ` ${cls}` : ""}`;
-    div.textContent = text;
+    div.textContent = text === "" ? "\u00A0" : text;
     body.appendChild(div);
     scrollToBottom();
     return div;
@@ -42,6 +42,13 @@
     html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="md-bold">$1</span>');
     // *italic*
     html = html.replace(/\*([^*]+)\*/g, '<span class="md-italic">$1</span>');
+    // <<highlight>>
+    html = html.replace(/&lt;&lt;([\s\S]*?)&gt;&gt;/g, '<span class="md-highlight">$1</span>');
+    // auto-link plain URLs
+    html = html.replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a class="md-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
     return html;
   };
 
@@ -49,7 +56,7 @@
     const div = document.createElement("div");
     div.className = `line${cls ? ` ${cls}` : ""}`;
     if (text === "") {
-      div.textContent = "";
+      div.textContent = "\u00A0";
     } else {
       div.innerHTML = parseInlineMd(text);
     }
@@ -106,13 +113,35 @@
     publications: [
       "PUBLICATIONS_",
       "",
-      "- 2024  Your Paper Title — Journal / Conference (placeholder)",
-      "- 2023  Another Paper Title — Journal / Conference (placeholder)",
+      "**Research Presentation**",
+      "[1] Lu, D., Shinwari, N., Xue, X., Chua, C., Hashiguchi, T., & Ueno, H. (2024, Jan 31 - Feb 3). Induction of high-affinity TFH cells after 1st shot predicts vaccine-induced antibody response [Poster presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kyoto, Japan.>>",
       "",
-      "AWARDS_",
-      "- 2024  Some Award Name (placeholder)",
+      "[2] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Aug 27 - 28). Identifying intercorrelation among the pre-existing immunity against emerging variants of SARS-CoV-2 [Oral presentation, peer-reviewed]. <<The 3rd Joint Symposium of AMED-SCARDA Supportive Institute, Hamamatsu, Japan.>>",
       "",
-      "Edit content.publications in app.js with your real publications & awards.",
+      "[3] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Dec 2 - 6). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral + Poster presentation, peer reviewed]. <<The 53rd Japanese Society of Immunology Annual Conference, Nagasaki, Japan.>>",
+      "",
+      "[4] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 7 - 8). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Poster presentation, peer reviewed]. <<The 22nd Takeda Science Foundation Symposium on Bioscience.>>",
+      "",
+      "[5] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 12 - 14). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 1st Kyoto Immunology Symposium, Kyoto, Japan.>>",
+      "",
+      "[6] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Mar 17 - 19). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kobe, Japan.>>",
+      "",
+      "",
+      "**Publications**",
+      "[1] 陸東韻、上野英樹. 感染症、ワクチン接種で誘導される濾胞性ヘルパーT 細胞応答. 炎症と免疫 vol32 no.6 2024 (Review article; not peer-reviewed)",
+      "",
+      "[2] Masuo, Y., Lu, D., Matsuyama, J. et al. Human immunology soars in Japan. Nat Immunol 26, 653-656 (2025). (Commentary; invited article, not peer-reviewed)",
+      "",
+      "",
+      "**Awards**",
+      "[1] Best Oral Presentation Award for Early Career Researcher in the 3rd Joint Symposium of Support Organizations.",
+      "",
+      "[2] Best Presentation Award in the 53rd Annual Meeting of Japanese Society of Immunology.",
+      "https://www2.aeplan.co.jp/jsi2024/en/best-presentation-award2024.html (WS08)",
+      "",
+      "[3] Best Oral Presentation Award for Early Career Researcher in the 2nd Joint Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Center.",
+      "https://www.utopia.u-tokyo.ac.jp/joint_symposium2025",
+      "",
     ],
     links: [
       "LINKS_",
@@ -615,6 +644,27 @@
     });
   };
 
+  const renderPublications = () => {
+    let startEl = null;
+    const dangerHeadings = new Set([
+      "**Research Presentation**",
+      "**Publications**",
+      "**Awards**",
+    ]);
+    content.publications.forEach((l, idx) => {
+      const cls = dangerHeadings.has(l)
+        ? "danger"
+        : (l.endsWith("_") ? "glow" : undefined);
+      const el = printMdLine(l, cls);
+      if (idx === 0) startEl = el;
+    });
+    // 打开 publications 后回到开头阅读
+    requestAnimationFrame(() => {
+      if (!startEl) return;
+      body.scrollTop = Math.max(0, startEl.offsetTop - 2);
+    });
+  };
+
   const run = (raw) => {
     const cmdline = normalize(raw);
     if (!cmdline) return;
@@ -634,6 +684,7 @@
         printLine("");
         printLine("  intro             show introduction");
         printLine("  help              show this help");
+        printLine("  home              go back to startup screen (reload)");
         printLine("  clear             clear screen");
         printLine("  ls                list sections in current folder");
         printLine("  pwd               print current folder");
@@ -799,7 +850,7 @@
           setSection("publications");
           state.currentWritingId = null;
           printLine("moved to /publications", "muted");
-          content.publications.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
+          renderPublications();
           break;
         }
         if (target === "links") {
@@ -837,7 +888,7 @@
       case "publications":
         setSection("publications");
         state.currentWritingId = null;
-        content.publications.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
+        renderPublications();
         break;
       case "links":
         setSection("links");
@@ -850,6 +901,9 @@
           break;
         }
         openExternal(arg0);
+        break;
+      case "home":
+        window.location.reload();
         break;
       default:
         printLine(`command not found: ${cmd} (type 'help')`, "error");
