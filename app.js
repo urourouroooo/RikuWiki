@@ -14,6 +14,14 @@
     currentWritingId: null,
     writingsCursor: 0,
     writingsIndexEls: [],
+    agentMode: false,
+    sectionBeforeAgent: "base",
+    agentHistory: [],
+    agentGreetingCount: 0,
+    agentBucketCounts: Object.create(null),
+    agentPrintQueue: Promise.resolve(),
+    typewriterMs: 12,
+    lastEveCatBadge: null,
   };
   const scrollToBottom = () => {
     body.scrollTop = body.scrollHeight;
@@ -26,6 +34,165 @@
     body.appendChild(div);
     scrollToBottom();
     return div;
+  };
+
+  const printTypeLine = (text, cls, perCharMs = state.typewriterMs) => {
+    const full = text === "" ? "\u00A0" : String(text);
+    const div = document.createElement("div");
+    div.className = `line${cls ? ` ${cls}` : ""}`;
+    div.textContent = "";
+    body.appendChild(div);
+    scrollToBottom();
+
+    return new Promise((resolve) => {
+      let i = 0;
+      const step = () => {
+        if (i >= full.length) {
+          resolve(div);
+          return;
+        }
+        i += 1;
+        div.textContent = full.slice(0, i);
+        scrollToBottom();
+        setTimeout(step, perCharMs);
+      };
+      step();
+    });
+  };
+
+  const createEvePixelCatBadge = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 12;
+    canvas.className = "eve-pixelcat";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    const css = getComputedStyle(document.documentElement);
+    const bodyColor = (css.getPropertyValue("--text") || "#7fffd6").trim();
+    const eyeColor = "#000000";
+    const mouthColor = eyeColor;
+    const shadowColor = "rgba(0,0,0,0.35)";
+
+    const frames = [
+      [
+        "................",
+        "................",
+        "......T..T......",
+        ".....TTTTTT.....",
+        "....TTETTETT....",
+        "...TTTTTTTTTT...",
+        "..TTTTTTTTTTTT..",
+        "...TTTTTTTTTT...",
+        "....TTTTTTTT....",
+        ".....TTTTTT.....",
+        "...T.........T..",
+        "................",
+      ],
+      [
+        "................",
+        "................",
+        "......T..T......",
+        ".....TTTTTT.....",
+        "....TTETTETT....",
+        "...TTTTTTTTTT...",
+        "..TTTTTTTTTTTT..",
+        "...TTTTTTTTTT...",
+        "....TTTTTTTT....",
+        ".....TTTTTT.....",
+        "..T...........T.",
+        "................",
+      ],
+      [
+        "................",
+        "................",
+        "......T..T......",
+        ".....TTTTTT.....",
+        "....TTETTETT....",
+        "...TTTTTTTTTT...",
+        "..TTTTTTTTTTTT..",
+        "...TTTTTTTTTT...",
+        "....TTTTTTTT....",
+        ".....TTTTTT.....",
+        ".T.............T",
+        "................",
+      ],
+      [
+        "................",
+        "................",
+        "......T..T......",
+        ".....TTTTTT.....",
+        "....TTETTETT....",
+        "...TTTTTTTTTT...",
+        "..TTTTTTTTTTTT..",
+        "...TTTTTTTTTT...",
+        "....TTTTTTTT....",
+        ".....TTTTTT.....",
+        "..T...........T.",
+        "................",
+      ],
+      [
+        "................",
+        "................",
+        "......T..T......",
+        ".....TTTTTT.....",
+        "....TTETTETT....",
+        "...TTTTTTTTTT...",
+        "..TTTTTTTTTTTT..",
+        "...TTTTTTTTTT...",
+        "....TTTTTTTT....",
+        ".....TTTTTT.....",
+        "...T.........T..",
+        "................",
+      ],
+    ];
+
+    const draw = (idx) => {
+      const frame = frames[idx % frames.length];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let y = 0; y < frame.length; y += 1) {
+        const row = frame[y];
+        for (let x = 0; x < row.length; x += 1) {
+          const c = row[x];
+          if (c === "." ) continue;
+          if (c === "T") ctx.fillStyle = bodyColor;
+          if (c === "E") ctx.fillStyle = eyeColor;
+          if (c === "M") ctx.fillStyle = mouthColor;
+          if (c === "S") ctx.fillStyle = shadowColor;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    };
+
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    draw(0);
+    if (reduceMotion) {
+      canvas.__stopAnim = () => {};
+      return canvas;
+    }
+
+    let frameIdx = 0;
+    const timer = setInterval(() => {
+      frameIdx = (frameIdx + 1) % frames.length;
+      draw(frameIdx);
+    }, 160);
+    canvas.__stopAnim = () => clearInterval(timer);
+    return canvas;
+  };
+
+  const attachEvePixelCatToLine = (lineEl) => {
+    if (!lineEl) return;
+    if (state.lastEveCatBadge && state.lastEveCatBadge.__stopAnim) {
+      state.lastEveCatBadge.__stopAnim();
+    }
+    if (state.lastEveCatBadge && state.lastEveCatBadge.parentNode) {
+      state.lastEveCatBadge.parentNode.removeChild(state.lastEveCatBadge);
+    }
+    const badge = createEvePixelCatBadge();
+    lineEl.appendChild(document.createTextNode(" "));
+    lineEl.appendChild(badge);
+    state.lastEveCatBadge = badge;
+    scrollToBottom();
   };
 
   const escapeHtml = (s) =>
@@ -151,9 +318,761 @@
       "- email: mailto:your@email.com",
     ],
   };
-  // 手动维护的 writings 条目
-  // 每篇一段 lines 数组，需要新增时照这个结构往下加即可
-  const writingsEntries = [
+
+  /** Minimal in-memory fallback when fetch fails (e.g. file://). Full corpus lives under persona/. */
+  const defaultPersonaData = {
+    profile: {
+      coreBio: [
+        "Persona files did not load. Serve the site over HTTP and ensure persona/manifest.json is reachable.",
+      ],
+      tone: ["Be concise and honest about limits."],
+      priorities: ["Do not invent facts."],
+    },
+    knowledgeBase: ["Corpus not loaded."],
+    scopeKeywords: ["dongyun", "eve", "cat"],
+    identity: {
+      core: ["Eve is a cat-persona rule engine on this page."],
+      capabilities: ["Answers depend on loaded persona fragments."],
+      boundaries: ["If files fail to load, replies stay minimal."],
+      faq: [
+        {
+          intent: "eve_identity",
+          keywords: ["who are you", "what are you"],
+          responses: [
+            "I am Eve, but my full corpus did not load. Check persona/manifest.json and use a local server.",
+          ],
+        },
+      ],
+    },
+    domains: {
+      eveIdentity: {
+        knowledgeBase: ["Eve corpus not loaded."],
+        scopeKeywords: ["eve", "cat"],
+        faq: [
+          {
+            intent: "eve_identity",
+            keywords: ["who are you"],
+            responses: ["Eve here — detailed answers need persona/fragments to load."],
+          },
+        ],
+      },
+      dongyunIdentity: {
+        knowledgeBase: ["Dongyun profile not loaded."],
+        scopeKeywords: ["dongyun"],
+        faq: [
+          {
+            intent: "dongyun_bio",
+            keywords: ["who is dongyun"],
+            responses: ["Dongyun's profile did not load; check persona fragments."],
+          },
+        ],
+      },
+      sections: {
+        cv: { knowledgeBase: [], scopeKeywords: ["cv"], faq: [] },
+        publications: { knowledgeBase: [], scopeKeywords: ["publication"], faq: [] },
+        writings: { knowledgeBase: [], scopeKeywords: ["writing"], faq: [], entries: {} },
+      },
+    },
+    prompts: {
+      enterMessage:
+        "Eve could not load her full corpus. Host over HTTP and open persona/manifest.json.",
+      enterIntro: "Eve (fallback mode).",
+      enterHint: "Type exit to leave agent mode.",
+      greetingReplies: ["Meow. Persona files missing — check persona/ folder."],
+      selfIdentityReplies: ["I am Eve, running on a thin fallback until files load."],
+      repeatGreetingReplies: ["Still here."],
+      repeatQuestionReplies: ["Similar question again — corpus may still be offline."],
+      ignoredReplies: ["(Eve ignored you — fallback mode.)"],
+      unknownReplies: ["I don't know; corpus not loaded."],
+      languageErrorReplies: ["English only, meow."],
+      eveDeflectReplies: ["Ask about Dongyun instead."],
+    },
+  };
+  let personaData = JSON.parse(JSON.stringify(defaultPersonaData));
+  /** True only after persona fragments (or legacy persona.json) loaded and applied. */
+  let personaCorpusLoaded = false;
+
+  const deepMergePersona = (target, source) => {
+    if (source === null || source === undefined) return target;
+    if (Array.isArray(source)) return source.slice();
+    if (typeof source !== "object") return source;
+    const base = target && typeof target === "object" && !Array.isArray(target) ? target : {};
+    const out = { ...base };
+    for (const key of Object.keys(source)) {
+      const sv = source[key];
+      const tv = base[key];
+      if (
+        sv !== null &&
+        typeof sv === "object" &&
+        !Array.isArray(sv) &&
+        tv !== null &&
+        typeof tv === "object" &&
+        !Array.isArray(tv)
+      ) {
+        out[key] = deepMergePersona(tv, sv);
+      } else {
+        out[key] = sv;
+      }
+    }
+    return out;
+  };
+
+  const toStringArray = (value, fallback) => {
+    if (!Array.isArray(value)) return fallback;
+    const arr = value
+      .filter((item) => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return arr.length > 0 ? arr : fallback;
+  };
+
+  const sanitizeFaqItems = (value, fallback) => {
+    if (!Array.isArray(value)) return fallback;
+    const faqs = value
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        intent: typeof item.intent === "string" ? item.intent : "",
+        keywords: toStringArray(item.keywords, []),
+        responses: toStringArray(item.responses, []),
+      }))
+      .filter((item) => item.keywords.length > 0 && item.responses.length > 0);
+    return faqs.length > 0 ? faqs : fallback;
+  };
+
+  const sanitizeDomainNode = (rawNode, fallbackNode) => ({
+    knowledgeBase: toStringArray(rawNode?.knowledgeBase, fallbackNode?.knowledgeBase || []),
+    scopeKeywords: toStringArray(rawNode?.scopeKeywords, fallbackNode?.scopeKeywords || []),
+    faq: sanitizeFaqItems(rawNode?.faq, fallbackNode?.faq || []),
+  });
+
+  const sanitizePersonaData = (raw) => {
+    const profile = (raw && typeof raw.profile === "object" && raw.profile) || {};
+    const prompts = (raw && typeof raw.prompts === "object" && raw.prompts) || {};
+    const legacyIdentity = raw?.identity || {};
+    const rawDomains = (raw && typeof raw.domains === "object" && raw.domains) || {};
+    const fallbackDomains = defaultPersonaData.domains;
+
+    const eveIdentityDomain = sanitizeDomainNode(
+      rawDomains.eveIdentity || {
+        knowledgeBase: legacyIdentity.core || [],
+        scopeKeywords: ["eve", "cat", "who are you"],
+        faq: legacyIdentity.faq || [],
+      },
+      fallbackDomains.eveIdentity
+    );
+    const dongyunIdentityDomain = sanitizeDomainNode(
+      rawDomains.dongyunIdentity || {
+        knowledgeBase: profile.coreBio || [],
+        scopeKeywords: ["dongyun", "dongyun lu", "东韵"],
+        faq: [],
+      },
+      fallbackDomains.dongyunIdentity
+    );
+    const cvDomain = sanitizeDomainNode(rawDomains?.sections?.cv, fallbackDomains.sections.cv);
+    const publicationsDomain = sanitizeDomainNode(
+      rawDomains?.sections?.publications,
+      fallbackDomains.sections.publications
+    );
+    const writingsBase = sanitizeDomainNode(rawDomains?.sections?.writings, fallbackDomains.sections.writings);
+    const rawEntries = rawDomains?.sections?.writings?.entries;
+    const entryFallbacks = fallbackDomains.sections.writings.entries || {};
+    const entries = {};
+    if (rawEntries && typeof rawEntries === "object") {
+      Object.keys(rawEntries).forEach((key) => {
+        entries[key] = sanitizeDomainNode(rawEntries[key], entryFallbacks[key] || { knowledgeBase: [], scopeKeywords: [], faq: [] });
+      });
+    }
+
+    return {
+      profile: {
+        coreBio: toStringArray(profile.coreBio, defaultPersonaData.profile.coreBio),
+        tone: toStringArray(profile.tone, defaultPersonaData.profile.tone),
+        priorities: toStringArray(profile.priorities, defaultPersonaData.profile.priorities),
+      },
+      knowledgeBase: toStringArray(raw?.knowledgeBase, defaultPersonaData.knowledgeBase),
+      scopeKeywords: toStringArray(raw?.scopeKeywords, defaultPersonaData.scopeKeywords),
+      identity: {
+        core: toStringArray(raw?.identity?.core, defaultPersonaData.identity.core),
+        capabilities: toStringArray(raw?.identity?.capabilities, defaultPersonaData.identity.capabilities),
+        boundaries: toStringArray(raw?.identity?.boundaries, defaultPersonaData.identity.boundaries),
+        faq: sanitizeFaqItems(raw?.identity?.faq, defaultPersonaData.identity.faq),
+      },
+      domains: {
+        eveIdentity: eveIdentityDomain,
+        dongyunIdentity: dongyunIdentityDomain,
+        sections: {
+          cv: cvDomain,
+          publications: publicationsDomain,
+          writings: {
+            knowledgeBase: writingsBase.knowledgeBase,
+            scopeKeywords: writingsBase.scopeKeywords,
+            faq: writingsBase.faq,
+            entries,
+          },
+        },
+      },
+      prompts: {
+        enterMessage:
+          typeof prompts.enterMessage === "string" && prompts.enterMessage.trim()
+            ? prompts.enterMessage
+            : defaultPersonaData.prompts.enterMessage,
+        enterIntro:
+          typeof prompts.enterIntro === "string" && prompts.enterIntro.trim()
+            ? prompts.enterIntro
+            : defaultPersonaData.prompts.enterIntro,
+        enterHint:
+          typeof prompts.enterHint === "string" && prompts.enterHint.trim()
+            ? prompts.enterHint
+            : defaultPersonaData.prompts.enterHint,
+        greetingReplies: toStringArray(
+          prompts.greetingReplies,
+          defaultPersonaData.prompts.greetingReplies
+        ),
+        selfIdentityReplies: toStringArray(
+          prompts.selfIdentityReplies,
+          defaultPersonaData.prompts.selfIdentityReplies
+        ),
+        repeatGreetingReplies: toStringArray(
+          prompts.repeatGreetingReplies,
+          defaultPersonaData.prompts.repeatGreetingReplies
+        ),
+        repeatQuestionReplies: toStringArray(
+          prompts.repeatQuestionReplies,
+          defaultPersonaData.prompts.repeatQuestionReplies
+        ),
+        ignoredReplies: toStringArray(
+          prompts.ignoredReplies,
+          defaultPersonaData.prompts.ignoredReplies
+        ),
+        unknownReplies: toStringArray(
+          prompts.unknownReplies,
+          defaultPersonaData.prompts.unknownReplies
+        ),
+        languageErrorReplies: toStringArray(
+          prompts.languageErrorReplies,
+          defaultPersonaData.prompts.languageErrorReplies
+        ),
+        eveDeflectReplies: toStringArray(
+          prompts.eveDeflectReplies,
+          defaultPersonaData.prompts.eveDeflectReplies
+        ),
+      },
+    };
+  };
+
+  const loadPersonaData = async () => {
+    const v = Date.now();
+    personaCorpusLoaded = false;
+    try {
+      let raw = null;
+      const baseUrl = new URL(".", window.location.href);
+      const manifestUrl = new URL("persona/manifest.json", baseUrl);
+      manifestUrl.searchParams.set("v", String(v));
+      const manifestRes = await fetch(manifestUrl.href, { cache: "no-store" });
+      if (manifestRes.ok) {
+        const manifest = await manifestRes.json();
+        const paths = Array.isArray(manifest.fragments) ? manifest.fragments : [];
+        let merged = {};
+        for (const rel of paths) {
+          const path = String(rel).replace(/^\//, "").replace(/^\.\//, "");
+          const partUrl = new URL(path, baseUrl);
+          partUrl.searchParams.set("v", String(v));
+          const partRes = await fetch(partUrl.href, { cache: "no-store" });
+          if (!partRes.ok) throw new Error(`${partUrl.pathname} HTTP ${partRes.status}`);
+          const part = await partRes.json();
+          merged = deepMergePersona(merged, part);
+        }
+        raw = merged;
+      }
+      if (!raw || Object.keys(raw).length === 0) {
+        const legacyUrl = new URL("persona.json", baseUrl);
+        legacyUrl.searchParams.set("v", String(v));
+        const legacyRes = await fetch(legacyUrl.href, { cache: "no-store" });
+        if (legacyRes.ok) raw = await legacyRes.json();
+      }
+      if (raw && Object.keys(raw).length > 0) {
+        personaData = sanitizePersonaData(raw);
+        personaCorpusLoaded = true;
+      }
+    } catch (err) {
+      console.warn("persona load failed, using in-memory default", err);
+      personaCorpusLoaded = false;
+    }
+  };
+
+  const personaLoadOnce = (() => {
+    let p = null;
+    return () => {
+      if (!p) p = loadPersonaData();
+      return p;
+    };
+  })();
+
+  const tokenize = (text) =>
+    String(text)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+  const EN_STOPWORDS = new Set([
+    "a", "an", "the", "is", "are", "am", "was", "were", "be", "been", "being",
+    "do", "does", "did", "to", "of", "in", "on", "at", "for", "with", "by",
+    "and", "or", "but", "if", "then", "than", "as", "from", "into", "about",
+    "what", "which", "who", "whom", "whose", "when", "where", "why", "how",
+    "can", "could", "should", "would", "will", "may", "might", "must",
+    "i", "you", "we", "they", "he", "she", "it", "me", "my", "your", "our", "their",
+  ]);
+
+  const contentTokens = (text) =>
+    tokenize(text).filter((t) => {
+      if (!t) return false;
+      if (EN_STOPWORDS.has(t)) return false;
+      if (/^\d+$/.test(t)) return false;
+      return t.length >= 2;
+    });
+
+  const getSectionDomain = () => {
+    const domains = personaData.domains || defaultPersonaData.domains;
+    if (state.section === "cv") return domains.sections.cv;
+    if (state.section === "publications") return domains.sections.publications;
+    if (state.section === "writings") return domains.sections.writings;
+    if (state.section.startsWith("writings/")) {
+      const id = state.section.replace("writings/", "");
+      const entry = domains.sections.writings.entries?.[id];
+      return entry || domains.sections.writings;
+    }
+    return null;
+  };
+
+  const collectDomainCorpus = (domain) => ({
+    knowledgeBase: toStringArray(domain?.knowledgeBase, []),
+    scopeKeywords: toStringArray(domain?.scopeKeywords, []),
+    faq: sanitizeFaqItems(domain?.faq, []),
+  });
+
+  const retrieveProfileHints = (userText, topK = 2, scopeKnowledgeBase = null) => {
+    const kb =
+      Array.isArray(scopeKnowledgeBase) && scopeKnowledgeBase.length > 0
+        ? scopeKnowledgeBase
+        : (personaData.knowledgeBase && personaData.knowledgeBase.length
+          ? personaData.knowledgeBase
+          : defaultPersonaData.knowledgeBase);
+    const queryTokens = contentTokens(userText);
+    if (queryTokens.length === 0) return kb.slice(0, topK);
+
+    const scored = kb.map((fact) => {
+      const factTokens = tokenize(fact);
+      let score = 0;
+      queryTokens.forEach((t) => {
+        if (factTokens.includes(t)) score += 2;
+        if (fact.toLowerCase().includes(t)) score += 1;
+      });
+      return { fact, score };
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK)
+      .map((x) => x.fact);
+  };
+
+  const getPersonaRelevanceStats = (userText, scopedDomain = null) => {
+    const tokens = contentTokens(userText);
+    if (tokens.length === 0) return { maxScore: 0, matchedTokens: 0 };
+
+    const scoped = collectDomainCorpus(scopedDomain);
+    const identity = personaData.identity || defaultPersonaData.identity;
+    const faqCorpus = Array.isArray(identity.faq)
+      ? identity.faq.flatMap((item) => [...(item.keywords || []), ...(item.responses || [])])
+      : [];
+    const scopeCorpus = [
+      ...(scoped.knowledgeBase.length > 0 ? scoped.knowledgeBase : (personaData.knowledgeBase || [])),
+      ...((personaData.profile && personaData.profile.coreBio) || []),
+      ...((personaData.profile && personaData.profile.tone) || []),
+      ...((personaData.profile && personaData.profile.priorities) || []),
+      ...(scoped.faq.flatMap((item) => [...(item.keywords || []), ...(item.responses || [])])),
+      ...(identity.core || []),
+      ...(identity.capabilities || []),
+      ...(identity.boundaries || []),
+      ...faqCorpus,
+      ...(scoped.scopeKeywords.length > 0
+        ? scoped.scopeKeywords
+        : ((personaData.scopeKeywords && personaData.scopeKeywords.length > 0)
+          ? personaData.scopeKeywords
+          : defaultPersonaData.scopeKeywords)),
+    ].filter(Boolean);
+
+    const queryTokens = tokens;
+    let maxScore = 0;
+    const matchedTokenSet = new Set();
+
+    scopeCorpus.forEach((fact) => {
+      const factLower = fact.toLowerCase();
+      const factTokens = tokenize(factLower);
+      let score = 0;
+      queryTokens.forEach((t) => {
+        if (factTokens.includes(t)) {
+          score += 3;
+          matchedTokenSet.add(t);
+        } else if (factLower.includes(t)) {
+          score += 1;
+          matchedTokenSet.add(t);
+        }
+      });
+      if (score > maxScore) maxScore = score;
+    });
+
+    return { maxScore, matchedTokens: matchedTokenSet.size };
+  };
+
+  const isLowRelevanceQuestion = (userText, scopedDomain = null) => {
+    const { maxScore, matchedTokens } = getPersonaRelevanceStats(userText, scopedDomain);
+    // 关联度阈值：至少命中 1 个关键词且有足够语义得分，否则按“猫咪未知”处理
+    return matchedTokens < 1 || maxScore < 3;
+  };
+
+  const normalizeIntentText = (text) =>
+    String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff\s]/g, " ")
+      // lightweight typo normalization for intent matching
+      .replace(/\bmet\b/g, "meet")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const pickRandom = (arr, fallback = "") => {
+    if (!Array.isArray(arr) || arr.length === 0) return fallback;
+    return arr[Math.floor(Math.random() * arr.length)];
+  };
+
+  const EVE_IDENTITY_FRAME =
+    "I run on a rule engine with a cat persona; I am not a real cat, not a human, and not an AI.";
+
+  const withEveIdentityFrame = (reply, force = false) => {
+    const text = String(reply || "").trim();
+    if (!text) return EVE_IDENTITY_FRAME;
+    const lower = text.toLowerCase();
+    const alreadyFramed =
+      lower.includes("rule engine") &&
+      lower.includes("not a real cat") &&
+      lower.includes("not a human") &&
+      lower.includes("not an ai");
+    if (!force && alreadyFramed) return text;
+    return `${text} ${EVE_IDENTITY_FRAME}`;
+  };
+
+  const containsAnyKeyword = (normalizedText, keywords) => {
+    const hay = ` ${normalizedText} `;
+    const textTokenSet = new Set(contentTokens(normalizedText));
+    return keywords.some((kw) => {
+      const k = normalizeIntentText(kw);
+      if (!k) return false;
+      if (hay.includes(` ${k} `) || normalizedText.includes(k)) return true;
+      const kwTokens = contentTokens(k);
+      if (kwTokens.length === 0) return false;
+      // Avoid over-matching: phrases like "who is dongyun" may collapse
+      // to a single token ("dongyun") after stopword filtering.
+      // Single-token fallback is too broad, so only allow token-subset
+      // matching when keyword retains at least 2 content tokens.
+      if (kwTokens.length < 2) return false;
+      return kwTokens.every((t) => textTokenSet.has(t));
+    });
+  };
+
+  const tryFaqReply = (normalizedText, faqs) => {
+    const list = Array.isArray(faqs) ? faqs : [];
+    for (const item of list) {
+      if (containsAnyKeyword(normalizedText, item.keywords || [])) {
+        return {
+          reply: pickRandom(item.responses, ""),
+          intent: item.intent || "faq",
+        };
+      }
+    }
+    return null;
+  };
+
+  const tryIdentityFaqReply = (normalizedText) => {
+    const domains = personaData.domains || defaultPersonaData.domains;
+    const domainReply = tryFaqReply(normalizedText, domains.eveIdentity?.faq || []);
+    if (domainReply) return domainReply;
+    const identity = personaData.identity || defaultPersonaData.identity;
+    return tryFaqReply(normalizedText, Array.isArray(identity.faq) ? identity.faq : []);
+  };
+
+  const tryDongyunFaqReply = (normalizedText) => {
+    const domains = personaData.domains || defaultPersonaData.domains;
+    return tryFaqReply(normalizedText, domains.dongyunIdentity?.faq || []);
+  };
+
+  const getBucketRepeatReply = (bucketId) => {
+    if (!bucketId) return "";
+    const prev = state.agentBucketCounts[bucketId] || 0;
+    state.agentBucketCounts[bucketId] = prev + 1;
+
+    const repeatQuestionReplies =
+      personaData.prompts?.repeatQuestionReplies &&
+      personaData.prompts.repeatQuestionReplies.length > 0
+        ? personaData.prompts.repeatQuestionReplies
+        : defaultPersonaData.prompts.repeatQuestionReplies;
+    const ignoredReplies =
+      personaData.prompts?.ignoredReplies && personaData.prompts.ignoredReplies.length > 0
+        ? personaData.prompts.ignoredReplies
+        : defaultPersonaData.prompts.ignoredReplies;
+
+    if (prev >= 2) return pickRandom(ignoredReplies);
+    if (prev >= 1) return pickRandom(repeatQuestionReplies);
+    return "";
+  };
+
+  const isNoiseOrSpamInput = (rawText) => {
+    const text = String(rawText || "");
+    const compact = text.replace(/\s+/g, "");
+    if (!compact) return true;
+
+    const normalized = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .trim();
+    const words = normalized ? normalized.split(/\s+/).filter(Boolean) : [];
+    const firstWord = words[0] || "";
+    const alnumMatches = compact.match(/[a-z0-9]/gi) || [];
+    const alnumRatio = alnumMatches.length / compact.length;
+    const uniqueChars = new Set(compact.toLowerCase().split(""));
+    const uniqueRatio = uniqueChars.size / compact.length;
+    const contentCount = contentTokens(text).length;
+
+    if (compact.length <= 2) return true;
+    if (contentCount === 0 && compact.length <= 6) return true;
+    if (alnumRatio < 0.35) return true;
+    if (uniqueRatio < 0.3 && compact.length >= 6) return true;
+    if (/^(.)\1{2,}$/i.test(compact)) return true;
+    if (/^(.)\1{4,}$/i.test(compact)) return true;
+    if (/^(asdf|qwer|zxcv|qwerty|asdfgh|1234|12345|1111)+$/i.test(compact)) return true;
+    if (words.length === 1) {
+      if (/^(.)\1{2,}$/i.test(firstWord)) return true;
+      if (firstWord.length >= 4 && !/[aeiou]/i.test(firstWord)) return true;
+    }
+    return false;
+  };
+
+  const isSelfIdentityIntent = (normalizedText) =>
+    /^(who are you|who r u|who re u|what are you)\??$/i.test(normalizedText) ||
+    /(^|\s)eve(\s|$).*(who are you|what are you)/i.test(normalizedText) ||
+    /(who are you|what are you).*(^|\s)eve(\s|$)/i.test(normalizedText);
+
+  const isDongyunIdentityIntent = (normalizedText) =>
+    /((who\s+is|who's|whos|introduce|tell me about|是谁|介绍).*(dongyun|dong yun|dongyun lu|东韵))|((dongyun|dong yun|dongyun lu|东韵).*(who\s+is|who's|whos|是谁))/i.test(
+      normalizedText
+    );
+
+  const isEvePersonalInfoIntent = (normalizedText) => {
+    const hasEveRef = /\beve\b/.test(normalizedText) || /\byou\b/.test(normalizedText);
+    if (!hasEveRef) return false;
+    return /(age|old|weight|weigh|birthday|born|birth|color|breed|size|height|profile|private)/.test(
+      normalizedText
+    );
+  };
+
+  const detectToneFlags = (profile) => {
+    const toneText = ((profile && profile.tone) || [])
+      .join(" ")
+      .toLowerCase();
+    const hasAny = (keywords) => keywords.some((k) => toneText.includes(k));
+    return {
+      conclusionFirst: hasAny(["conclusion first", "先给结论", "先结论"]),
+      conciseWarm: hasAny(["concise", "简洁", "warm", "温和"]),
+      stateUncertainty: hasAny(["uncertainty", "不确定", "uncertain"]),
+    };
+  };
+
+  const composeToneReply = (profile, { conclusion = "", context = "", nextStep = "", uncertain = false }) => {
+    const flags = detectToneFlags(profile);
+    const parts = [];
+    const c = String(conclusion || "").trim();
+    const ctx = String(context || "").trim();
+    const n = String(nextStep || "").trim();
+
+    if (flags.conclusionFirst) {
+      if (c) parts.push(c);
+      if (ctx) parts.push(ctx);
+    } else {
+      if (ctx) parts.push(ctx);
+      if (c) parts.push(c);
+    }
+
+    if (uncertain && flags.stateUncertainty) {
+      parts.push("I may be wrong here, because I am just a cat.");
+    }
+    if (n) parts.push(n);
+
+    if (flags.conciseWarm) {
+      return parts.slice(0, 3).join(" ").trim();
+    }
+    return parts.join(" ").trim();
+  };
+
+  const buildAgentReply = (userText) => {
+    const profile = personaData.profile || defaultPersonaData.profile;
+    const domains = personaData.domains || defaultPersonaData.domains;
+    const sectionDomain = getSectionDomain();
+    const scoped = collectDomainCorpus(sectionDomain);
+    const text = userText.trim();
+    const lower = text.toLowerCase();
+    const hints = retrieveProfileHints(text, 2, scoped.knowledgeBase);
+
+    if (!text) return "Ask me anything, for example: What research are you currently focused on?";
+    const normalizedText = normalizeIntentText(lower);
+    if (/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(text)) {
+      const languageErrorReplies =
+        personaData.prompts?.languageErrorReplies && personaData.prompts.languageErrorReplies.length > 0
+          ? personaData.prompts.languageErrorReplies
+          : defaultPersonaData.prompts.languageErrorReplies;
+      return pickRandom(languageErrorReplies);
+    }
+    if (/^(hi|hello|hey)( eve)?$/i.test(normalizedText)) {
+      const greetingReplies =
+        personaData.prompts?.greetingReplies && personaData.prompts.greetingReplies.length > 0
+          ? personaData.prompts.greetingReplies
+          : defaultPersonaData.prompts.greetingReplies;
+      const repeatGreetingReplies =
+        personaData.prompts?.repeatGreetingReplies &&
+        personaData.prompts.repeatGreetingReplies.length > 0
+          ? personaData.prompts.repeatGreetingReplies
+          : defaultPersonaData.prompts.repeatGreetingReplies;
+      const ignoredReplies =
+        personaData.prompts?.ignoredReplies && personaData.prompts.ignoredReplies.length > 0
+          ? personaData.prompts.ignoredReplies
+          : defaultPersonaData.prompts.ignoredReplies;
+
+      const hasGreetedBefore = state.agentGreetingCount > 0;
+      state.agentGreetingCount += 1;
+      if (state.agentGreetingCount >= 3) {
+        return pickRandom(ignoredReplies);
+      }
+      const pool = hasGreetedBefore ? repeatGreetingReplies : greetingReplies;
+      return pickRandom(pool);
+    }
+    if (isNoiseOrSpamInput(text)) {
+      const ignoredReplies =
+        personaData.prompts?.ignoredReplies && personaData.prompts.ignoredReplies.length > 0
+          ? personaData.prompts.ignoredReplies
+          : defaultPersonaData.prompts.ignoredReplies;
+      return pickRandom(ignoredReplies);
+    }
+    if (isDongyunIdentityIntent(normalizedText)) {
+      const repeat = getBucketRepeatReply("bucket:dongyun_identity");
+      if (repeat) return repeat;
+      const dongyunKb = domains.dongyunIdentity?.knowledgeBase || profile.coreBio || [];
+      const bioA = dongyunKb[0] || profile.coreBio[0] || "Dongyun is a researcher based in Kyoto.";
+      const bioB = dongyunKb[1] || profile.coreBio[1] || "";
+      return composeToneReply(profile, {
+        conclusion: bioA,
+        context: bioB,
+      });
+    }
+    const dongyunReply = tryDongyunFaqReply(normalizedText);
+    if (dongyunReply) {
+      const repeat = getBucketRepeatReply(`bucket:dongyun_identity:${dongyunReply.intent}`);
+      if (repeat) return repeat;
+      return dongyunReply.reply;
+    }
+    const sectionFaqReply = tryFaqReply(normalizedText, scoped.faq);
+    if (sectionFaqReply) {
+      const repeat = getBucketRepeatReply(`bucket:section:${state.section}:${sectionFaqReply.intent}`);
+      if (repeat) return repeat;
+      return sectionFaqReply.reply;
+    }
+    const identityReply = tryIdentityFaqReply(normalizedText);
+    if (identityReply) {
+      const repeat = getBucketRepeatReply(`bucket:eve_identity:${identityReply.intent}`);
+      if (repeat) return repeat;
+      const needsIdentityFrame = identityReply.intent === "eve_identity";
+      return needsIdentityFrame
+        ? withEveIdentityFrame(identityReply.reply)
+        : identityReply.reply;
+    }
+    if (isSelfIdentityIntent(normalizedText)) {
+      const repeat = getBucketRepeatReply("bucket:self_identity");
+      if (repeat) return repeat;
+      const selfIdentityReplies =
+        personaData.prompts?.selfIdentityReplies && personaData.prompts.selfIdentityReplies.length > 0
+          ? personaData.prompts.selfIdentityReplies
+          : defaultPersonaData.prompts.selfIdentityReplies;
+      return withEveIdentityFrame(pickRandom(selfIdentityReplies), true);
+    }
+    if (isEvePersonalInfoIntent(normalizedText)) {
+      const repeat = getBucketRepeatReply("bucket:eve_deflect");
+      if (repeat) return repeat;
+      const eveDeflectReplies =
+        personaData.prompts?.eveDeflectReplies && personaData.prompts.eveDeflectReplies.length > 0
+          ? personaData.prompts.eveDeflectReplies
+          : defaultPersonaData.prompts.eveDeflectReplies;
+      return pickRandom(eveDeflectReplies);
+    }
+    if (isLowRelevanceQuestion(text, sectionDomain)) {
+      const unknownReplies =
+        personaData.prompts?.unknownReplies && personaData.prompts.unknownReplies.length > 0
+          ? personaData.prompts.unknownReplies
+          : defaultPersonaData.prompts.unknownReplies;
+      return pickRandom(unknownReplies);
+    }
+    if (/(怎么做|如何|步骤|实现|build|implement)/i.test(lower)) {
+      return composeToneReply(profile, {
+        conclusion: "Start with a minimal viable version.",
+        context: "Then iterate in three steps: build the core flow, validate with real input, and improve UX.",
+        nextStep: `For your question, I would prioritize: ${hints.join("; ")}.`,
+      });
+    }
+    const unknownReplies =
+      personaData.prompts?.unknownReplies && personaData.prompts.unknownReplies.length > 0
+        ? personaData.prompts.unknownReplies
+        : defaultPersonaData.prompts.unknownReplies;
+    return pickRandom(unknownReplies);
+  };
+
+  const enterAgentMode = ({ clearScreen = false } = {}) => {
+    if (state.agentMode) {
+      printLine("already in /agent", "muted");
+      return;
+    }
+    if (clearScreen) body.innerHTML = "";
+    state.sectionBeforeAgent = state.section;
+    state.agentMode = true;
+    state.agentGreetingCount = 0;
+    state.agentBucketCounts = Object.create(null);
+    setSection("agent");
+    printLine("AGENT MODE_", "glow");
+    printLine(personaData.prompts.enterMessage, "ok");
+    printLine(personaData.prompts.enterIntro, "dim");
+    printLine(personaData.prompts.enterHint, "dim");
+    if (!personaCorpusLoaded) {
+      const proto = window.location.protocol;
+      if (proto === "file:") {
+        printLine(
+          "Persona JSON cannot load under file://. Run a local server from this folder, e.g. python3 -m http.server, then open http://127.0.0.1:8000/",
+          "error"
+        );
+      } else {
+        printLine(
+          "Persona files did not load (check console / deploy includes persona/). You are seeing fallback replies.",
+          "dim"
+        );
+      }
+    }
+  };
+
+  const exitAgentMode = () => {
+    if (!state.agentMode) return;
+    state.agentMode = false;
+    setSection(state.sectionBeforeAgent || "base");
+    printLine(`left /agent, back to /${state.section}`, "muted");
+  };
+  // 手动维护的 writings 条目（作为回退）
+  // 现在支持从 writings/index.json + *.md 动态加载。
+  // 若文件加载失败，会自动回退到这里的内置内容。
+  let writingsEntries = [
     {
       id: "philo-last-class",
       title: "关于本科最后的哲学课",
@@ -522,6 +1441,57 @@
     },
   ];
 
+  const loadWritingsFromFiles = async () => {
+    try {
+      const res = await fetch(`./writings/index.json?v=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return false;
+      const json = await res.json();
+      const entries = Array.isArray(json?.entries) ? json.entries : [];
+      if (entries.length === 0) return false;
+
+      const loaded = [];
+      for (const entry of entries) {
+        const id = typeof entry?.id === "string" ? entry.id.trim() : "";
+        const title = typeof entry?.title === "string" ? entry.title.trim() : "";
+        const files = entry?.files && typeof entry.files === "object" ? entry.files : {};
+        if (!id || !title) continue;
+
+        const linesByLang = {};
+        for (const lang of Object.keys(files)) {
+          const filePath = files[lang];
+          if (typeof filePath !== "string" || !filePath.trim()) continue;
+          try {
+            const fileRes = await fetch(`${filePath}?v=${Date.now()}`, { cache: "no-store" });
+            if (!fileRes.ok) continue;
+            const text = await fileRes.text();
+            linesByLang[lang] = text.replace(/\r\n/g, "\n").split("\n");
+          } catch (_) {
+            // ignore one broken file, keep trying other language files
+          }
+        }
+
+        if (Object.keys(linesByLang).length > 0) {
+          loaded.push({ id, title, linesByLang });
+        }
+      }
+
+      if (loaded.length > 0) {
+        writingsEntries = loaded;
+        state.writingsCursor = 0;
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const bootstrap = async () => {
+    await personaLoadOnce();
+    await loadWritingsFromFiles();
+  };
+  void bootstrap();
+
   const openExternal = (key) => {
     const map = {
       github: "https://github.com/yourname",
@@ -665,7 +1635,7 @@
     });
   };
 
-  const run = (raw) => {
+  const run = async (raw) => {
     const cmdline = normalize(raw);
     if (!cmdline) return;
 
@@ -698,6 +1668,8 @@
         printLine("  publications      show publications & awards");
         printLine("  links             show links");
         printLine("  open <key>        open external (e.g. open github)");
+        printLine("  agent             enter local chat mode");
+        printLine("  exit [agent]      exit agent mode");
         break;
       case "ls":
         if (state.section === "base") {
@@ -707,6 +1679,11 @@
           printLine("  writings");
           printLine("  publications");
           printLine("  links");
+          printLine("  agent");
+        } else if (state.section === "agent") {
+          printLine("agent/:");
+          printLine("  chat (type anything)");
+          printLine("  exit");
         } else if (state.section === "cv") {
           printLine("cv/:");
           printLine("  cv (virtual file)");
@@ -839,6 +1816,11 @@
           content.cv.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
           break;
         }
+        if (target === "agent") {
+          await personaLoadOnce();
+          enterAgentMode();
+          break;
+        }
         if (["writing", "writting", "writtings", "writings"].includes(target)) {
           setSection("writings");
           state.currentWritingId = null;
@@ -905,16 +1887,47 @@
       case "home":
         window.location.reload();
         break;
+      case "agent":
+        await personaLoadOnce();
+        enterAgentMode();
+        break;
+      case "exit":
+      case "quit":
+        if (arg0 && arg0 !== "agent") {
+          printLine("usage: exit agent", "error");
+          break;
+        }
+        if (state.agentMode) {
+          exitAgentMode();
+        } else {
+          printLine("exit: only available in /agent", "error");
+        }
+        break;
       default:
-        printLine(`command not found: ${cmd} (type 'help')`, "error");
+        if (state.agentMode) {
+          const userText = cmdline;
+          state.agentHistory.push({ role: "user", text: userText });
+          const reply = buildAgentReply(userText);
+          state.agentHistory.push({ role: "assistant", text: reply });
+          if (state.agentHistory.length > 20) {
+            state.agentHistory = state.agentHistory.slice(-20);
+          }
+          state.agentPrintQueue = state.agentPrintQueue
+            .then(() => printTypeLine(`Eve> ${reply}`, "ok"))
+            .then((lineEl) => {
+              attachEvePixelCatToLine(lineEl);
+            });
+        } else {
+          printLine(`command not found: ${cmd} (type 'help')`, "error");
+        }
     }
   };
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = input.value;
     input.value = "";
-    run(v);
+    await run(v);
   });
 
   input.addEventListener("keydown", (e) => {

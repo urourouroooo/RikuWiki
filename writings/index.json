@@ -1,0 +1,21 @@
+{
+  "entries": [
+    {
+      "id": "philo-last-class",
+      "title": "关于本科最后的哲学课",
+      "files": {
+        "zh": "./writings/philo-last-class.zh.md",
+        "eng": "./writings/philo-last-class.eng.md",
+        "jap": "./writings/philo-last-class.jap.md"
+      }
+    },
+    {
+      "id": "stardust-to-stardust",
+      "title": "STARDUST to STARDUST：Reflecting on Living and Dying",
+      "files": {
+        "zh": "./writings/stardust-to-stardust.zh.md",
+        "eng": "./writings/stardust-to-stardust.eng.md"
+      }
+    }
+  ]
+}

@@ -148,6 +148,16 @@ body{
   text-shadow: 0 0 10px rgba(0,229,255,.35), 0 0 18px rgba(0,229,255,.18);
 }
 
+.eve-pixelcat{
+  width: 28px;
+  height: 21px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  vertical-align: text-bottom;
+  margin-left: 4px;
+  opacity: 0.92;
+}
+
 .sr-only{
   position:absolute;
   width:1px;

@@ -1,0 +1,21 @@
+{
+  "entries": [
+    {
+      "id": "philo-last-class",
+      "title": "Regarding my final philosophy class",
+      "files": {
+        "zh": "./writings/philo-last-class.zh.md",
+        "eng": "./writings/philo-last-class.eng.md",
+        "jap": "./writings/philo-last-class.jap.md"
+      }
+    },
+    {
+      "id": "stardust-to-stardust",
+      "title": "STARDUST to STARDUST",
+      "files": {
+        "zh": "./writings/stardust-to-stardust.zh.md",
+        "eng": "./writings/stardust-to-stardust.eng.md"
+      }
+    }
+  ]
+}
