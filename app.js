@@ -15,6 +15,8 @@
     writingsCursor: 0,
     writingsIndexEls: [],
   };
+  /** 离开 /writings 列表或刷新列表时递增，用于中止仍在跑的打字机动画（否则会反复 scrollToBottom 把视图拉到底） */
+  let writingsHintSession = 0;
   const scrollToBottom = () => {
     body.scrollTop = body.scrollHeight;
   };
@@ -53,7 +55,12 @@
     return Math.max(0, Math.ceil(h));
   };
 
-  const typewriterFillLineEl = (div, text, perCharMs = WRITINGS_HINT_TYPE_MS) => {
+  const typewriterFillLineEl = (
+    div,
+    text,
+    perCharMs = WRITINGS_HINT_TYPE_MS,
+    hintSession = null
+  ) => {
     const full = text === "" ? "\u00A0" : String(text);
     if (
       window.matchMedia &&
@@ -66,6 +73,9 @@
     return new Promise((resolve) => {
       let i = 0;
       const step = () => {
+        if (hintSession !== null && writingsHintSession !== hintSession) {
+          return;
+        }
         if (i >= full.length) {
           resolve();
           return;
@@ -134,26 +144,6 @@
      
     
     ],
-    cv: [
-      "CV_",
-      "",
-      "- name: DONGYUN LU/陸東韻/リク トウイン",
-      "- email: ludongyun3@gmail.com",
-      "- language: 中文, English, 日本語",
-      "- major focus: Biology/Medicine Science/Immunology/Human Immunology",
-      "- hobbies:",
-      "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Painting (Acrylic, Collage，illustration)",
-      "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Reading (Literatures, and those Books on Sociology, Ethics and Epistemology)",
-      "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Swimming (Literally thinking about nothing when swimming)",
-      "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Video Gaming (Nintendo series, especially Pokemon)",
-      "\u00A0",
-      "2015-2018 : Shanghai Shixi High School.",
-      "2018-2022 : Bs., Shanghai Jiao Tong University, Biotechnology(major)/Philosophy(Minor).",
-      "2023-2024 : Research student, Kyoto University, Immunology.",
-      "2024-2026 : Master's Program, Kyoto University, Immunology.",
-      "2026-now : Doctoral's Program, Kyoto University, Immunology.",
-      
-    ],
     writing: [
       "WRITING_",
       "",
@@ -162,39 +152,6 @@
       "",
       "Edit content.writing in app.js to reflect your posts / diary.",
     ],
-    publications: [
-      "PUBLICATIONS_",
-      "",
-      "**Research Presentation**",
-      "[1] Lu, D., Shinwari, N., Xue, X., Chua, C., Hashiguchi, T., & Ueno, H. (2024, Jan 31 - Feb 3). Induction of high-affinity TFH cells after 1st shot predicts vaccine-induced antibody response [Poster presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kyoto, Japan.>>",
-      "",
-      "[2] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Aug 27 - 28). Identifying intercorrelation among the pre-existing immunity against emerging variants of SARS-CoV-2 [Oral presentation, peer-reviewed]. <<The 3rd Joint Symposium of AMED-SCARDA Supportive Institute, Hamamatsu, Japan.>>",
-      "",
-      "[3] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Dec 2 - 6). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral + Poster presentation, peer reviewed]. <<The 53rd Japanese Society of Immunology Annual Conference, Nagasaki, Japan.>>",
-      "",
-      "[4] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 7 - 8). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Poster presentation, peer reviewed]. <<The 22nd Takeda Science Foundation Symposium on Bioscience.>>",
-      "",
-      "[5] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 12 - 14). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 1st Kyoto Immunology Symposium, Kyoto, Japan.>>",
-      "",
-      "[6] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Mar 17 - 19). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kobe, Japan.>>",
-      "",
-      "",
-      "**Publications**",
-      "[1] 陸東韻、上野英樹. 感染症、ワクチン接種で誘導される濾胞性ヘルパーT 細胞応答. 炎症と免疫 vol32 no.6 2024 (Review article; not peer-reviewed)",
-      "",
-      "[2] Masuo, Y., Lu, D., Matsuyama, J. et al. Human immunology soars in Japan. Nat Immunol 26, 653-656 (2025). (Commentary; invited article, not peer-reviewed)",
-      "",
-      "",
-      "**Awards**",
-      "[1] Best Oral Presentation Award for Early Career Researcher in the 3rd Joint Symposium of Support Organizations.",
-      "",
-      "[2] Best Presentation Award in the 53rd Annual Meeting of Japanese Society of Immunology.",
-      "https://www2.aeplan.co.jp/jsi2024/en/best-presentation-award2024.html (WS08)",
-      "",
-      "[3] Best Oral Presentation Award for Early Career Researcher in the 2nd Joint Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Center.",
-      "https://www.utopia.u-tokyo.ac.jp/joint_symposium2025",
-      "",
-    ],
     links: [
       "LINKS_",
       "",
@@ -202,6 +159,86 @@
       "- x: https://x.com/yourname",
       "- email: mailto:your@email.com",
     ],
+  };
+
+  const defaultCvLines = [
+    "CV_",
+    "",
+    "- name: DONGYUN LU/陸東韻/リク トウイン",
+    "- email: ludongyun3@gmail.com",
+    "- language: 中文, English, 日本語",
+    "- major focus: Biology/Medicine Science/Immunology/Human Immunology",
+    "- hobbies:",
+    "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Painting (Acrylic, Collage，illustration)",
+    "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Reading (Literatures, and those Books on Sociology, Ethics and Epistemology)",
+    "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Swimming (Literally thinking about nothing when swimming)",
+    "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 Video Gaming (Nintendo series, especially Pokemon)",
+    "\u00A0",
+    "2015-2018 : Shanghai Shixi High School.",
+    "2018-2022 : Bs., Shanghai Jiao Tong University, Biotechnology(major)/Philosophy(Minor).",
+    "2023-2024 : Research student, Kyoto University, Immunology.",
+    "2024-2026 : Master's Program, Kyoto University, Immunology.",
+    "2026-now : Doctoral's Program, Kyoto University, Immunology.",
+  ];
+
+  const defaultPublicationsLines = [
+    "PUBLICATIONS_",
+    "",
+    "**Research Presentation**",
+    "[1] Lu, D., Shinwari, N., Xue, X., Chua, C., Hashiguchi, T., & Ueno, H. (2024, Jan 31 - Feb 3). Induction of high-affinity TFH cells after 1st shot predicts vaccine-induced antibody response [Poster presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kyoto, Japan.>>",
+    "",
+    "[2] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Aug 27 - 28). Identifying intercorrelation among the pre-existing immunity against emerging variants of SARS-CoV-2 [Oral presentation, peer-reviewed]. <<The 3rd Joint Symposium of AMED-SCARDA Supportive Institute, Hamamatsu, Japan.>>",
+    "",
+    "[3] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2024, Dec 2 - 6). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral + Poster presentation, peer reviewed]. <<The 53rd Japanese Society of Immunology Annual Conference, Nagasaki, Japan.>>",
+    "",
+    "[4] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 7 - 8). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Poster presentation, peer reviewed]. <<The 22nd Takeda Science Foundation Symposium on Bioscience.>>",
+    "",
+    "[5] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Feb 12 - 14). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 1st Kyoto Immunology Symposium, Kyoto, Japan.>>",
+    "",
+    "[6] Lu, D., Chua, C., Shinwari, N., Xue, X., Hashiguchi, T., Ito, I., Kotaki, R., Takahashi, Y., & Ueno, H. (2025, Mar 17 - 19). Antigen-specific high avidity CD4⁺ T cells correlate with pre-existing antigen-specific proliferating B cells and neutralizing antibody titers [Oral presentation, peer-reviewed]. <<The 2nd Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Centers, Kobe, Japan.>>",
+    "",
+    "",
+    "**Publications**",
+    "[1] 陸東韻、上野英樹. 感染症、ワクチン接種で誘導される濾胞性ヘルパーT 細胞応答. 炎症と免疫 vol32 no.6 2024 (Review article; not peer-reviewed)",
+    "",
+    "[2] Masuo, Y., Lu, D., Matsuyama, J. et al. Human immunology soars in Japan. Nat Immunol 26, 653-656 (2025). (Commentary; invited article, not peer-reviewed)",
+    "",
+    "",
+    "**Awards**",
+    "[1] Best Oral Presentation Award for Early Career Researcher in the 3rd Joint Symposium of Support Organizations.",
+    "",
+    "[2] Best Presentation Award in the 53rd Annual Meeting of Japanese Society of Immunology.",
+    "https://www2.aeplan.co.jp/jsi2024/en/best-presentation-award2024.html (WS08)",
+    "",
+    "[3] Best Oral Presentation Award for Early Career Researcher in the 2nd Joint Symposium of AMED SCARDA Japan Initiative for World-leading Vaccine Research and Development Center.",
+    "https://www.utopia.u-tokyo.ac.jp/joint_symposium2025",
+    "",
+  ];
+
+  let cvLines = defaultCvLines;
+  let publicationsLines = defaultPublicationsLines;
+
+  const loadCvAndPublications = async () => {
+    try {
+      const res = await fetch(`./cv/cv.md?v=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.replace(/\r\n/g, "\n").split("\n");
+        if (lines.length > 0) cvLines = lines;
+      }
+    } catch (_) {}
+    try {
+      const res = await fetch(`./publications/publications.md?v=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.replace(/\r\n/g, "\n").split("\n");
+        if (lines.length > 0) publicationsLines = lines;
+      }
+    } catch (_) {}
+  };
+
+  const renderCv = () => {
+    cvLines.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
   };
 
   // 手动维护的 writings 条目（作为回退）
@@ -576,9 +613,47 @@
     },
   ];
 
+  const fetchWritingByConvention = async (id, lang) => {
+    if (!id || !lang) return null;
+    try {
+      const url = new URL(`./writings/${id}.${lang}.md`, window.location.href);
+      url.searchParams.set("v", String(Date.now()));
+      const fileRes = await fetch(url.href, { cache: "no-store" });
+      if (!fileRes.ok) return null;
+      const text = await fileRes.text();
+      return text.replace(/\r\n/g, "\n").split("\n");
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const ensureWritingLang = async (item, lang) => {
+    if (item.linesByLang?.[lang]?.length) return true;
+    const lines = await fetchWritingByConvention(item.id, lang);
+    if (!lines) return false;
+    if (!item.linesByLang) item.linesByLang = {};
+    item.linesByLang[lang] = lines;
+    return true;
+  };
+
+  const enrichWritingsWithMissingLangFiles = async () => {
+    for (const item of writingsEntries) {
+      for (const lang of ["zh", "eng", "jap"]) {
+        if (item.linesByLang?.[lang]?.length) continue;
+        const lines = await fetchWritingByConvention(item.id, lang);
+        if (lines) {
+          if (!item.linesByLang) item.linesByLang = {};
+          item.linesByLang[lang] = lines;
+        }
+      }
+    }
+  };
+
   const loadWritingsFromFiles = async () => {
     try {
-      const res = await fetch(`./writings/index.json?v=${Date.now()}`, { cache: "no-store" });
+      const indexUrl = new URL("./writings/index.json", window.location.href);
+      indexUrl.searchParams.set("v", String(Date.now()));
+      const res = await fetch(indexUrl.href, { cache: "no-store" });
       if (!res.ok) return false;
       const json = await res.json();
       const entries = Array.isArray(json?.entries) ? json.entries : [];
@@ -596,7 +671,9 @@
           const filePath = files[lang];
           if (typeof filePath !== "string" || !filePath.trim()) continue;
           try {
-            const fileRes = await fetch(`${filePath}?v=${Date.now()}`, { cache: "no-store" });
+            const fileUrl = new URL(filePath.trim(), window.location.href);
+            fileUrl.searchParams.set("v", String(Date.now()));
+            const fileRes = await fetch(fileUrl.href, { cache: "no-store" });
             if (!fileRes.ok) continue;
             const text = await fileRes.text();
             linesByLang[lang] = text.replace(/\r\n/g, "\n").split("\n");
@@ -623,6 +700,8 @@
 
   const bootstrap = async () => {
     await loadWritingsFromFiles();
+    await enrichWritingsWithMissingLangFiles();
+    await loadCvAndPublications();
   };
   void bootstrap();
 
@@ -641,6 +720,10 @@
   };
 
   const setSection = (label) => {
+    const prev = state.section;
+    if (prev === "writings" && label !== "writings") {
+      writingsHintSession += 1;
+    }
     state.section = label;
     if (promptPath) promptPath.textContent = label;
   };
@@ -655,6 +738,8 @@
     "After entering each article, the default language is Chinese (zh), but you can type eng to switch to English or jap to switch to Japanese.";
 
   const printWritingsIndex = () => {
+    writingsHintSession += 1;
+    const hintSession = writingsHintSession;
     if (
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -668,8 +753,11 @@
       const h2 = measureLineHeightForText(WRITINGS_HINT_2, "dim");
       if (h1 > 0) hintEl1.style.minHeight = `${h1}px`;
       if (h2 > 0) hintEl2.style.minHeight = `${h2}px`;
-      void typewriterFillLineEl(hintEl1, WRITINGS_HINT_1).then(() =>
-        typewriterFillLineEl(hintEl2, WRITINGS_HINT_2)
+      void typewriterFillLineEl(hintEl1, WRITINGS_HINT_1, WRITINGS_HINT_TYPE_MS, hintSession).then(
+        () => {
+          if (writingsHintSession !== hintSession) return;
+          return typewriterFillLineEl(hintEl2, WRITINGS_HINT_2, WRITINGS_HINT_TYPE_MS, hintSession);
+        }
       );
     }
 
@@ -760,10 +848,17 @@
       printMdLine(line);
     });
     printLine("--- end ---", "muted");
-    // 打开文章后从标题处开始阅读，而不是停在底部
-    requestAnimationFrame(() => {
+    const scrollToArticleStart = () => {
       if (!startEl) return;
-      body.scrollTop = Math.max(0, startEl.offsetTop - 2);
+      const top =
+        startEl.getBoundingClientRect().top -
+        body.getBoundingClientRect().top +
+        body.scrollTop;
+      body.scrollTop = Math.max(0, top - 2);
+    };
+    requestAnimationFrame(() => {
+      scrollToArticleStart();
+      requestAnimationFrame(scrollToArticleStart);
     });
   };
 
@@ -774,17 +869,20 @@
       "**Publications**",
       "**Awards**",
     ]);
-    content.publications.forEach((l, idx) => {
+    publicationsLines.forEach((l, idx) => {
       const cls = dangerHeadings.has(l)
         ? "danger"
         : (l.endsWith("_") ? "glow" : undefined);
       const el = printMdLine(l, cls);
       if (idx === 0) startEl = el;
     });
-    // 打开 publications 后回到开头阅读
     requestAnimationFrame(() => {
       if (!startEl) return;
-      body.scrollTop = Math.max(0, startEl.offsetTop - 2);
+      const top =
+        startEl.getBoundingClientRect().top -
+        body.getBoundingClientRect().top +
+        body.scrollTop;
+      body.scrollTop = Math.max(0, top - 2);
     });
   };
 
@@ -881,12 +979,14 @@
           printLine("eng: current writing not found", "error");
           break;
         }
-        if (!(item.linesByLang && item.linesByLang.eng)) {
-          printLine("Not Available for Now...", "dim");
-          break;
-        }
-        state.lang = "eng";
-        renderWriting(item);
+        void (async () => {
+          if (!(await ensureWritingLang(item, "eng"))) {
+            printLine("Not Available for Now...", "dim");
+            return;
+          }
+          state.lang = "eng";
+          renderWriting(item);
+        })();
         break;
       }
       case "jap":
@@ -900,12 +1000,14 @@
           printLine("jap: current writing not found", "error");
           break;
         }
-        if (!(item.linesByLang && item.linesByLang.jap)) {
-          printLine("Not Available for Now...", "dim");
-          break;
-        }
-        state.lang = "jap";
-        renderWriting(item);
+        void (async () => {
+          if (!(await ensureWritingLang(item, "jap"))) {
+            printLine("Not Available for Now...", "dim");
+            return;
+          }
+          state.lang = "jap";
+          renderWriting(item);
+        })();
         break;
       }
       case "zh":
@@ -919,12 +1021,14 @@
           printLine("zh: current writing not found", "error");
           break;
         }
-        if (!(item.linesByLang && item.linesByLang.zh)) {
-          printLine("Not Available for Now...", "dim");
-          break;
-        }
-        state.lang = "zh";
-        renderWriting(item);
+        void (async () => {
+          if (!(await ensureWritingLang(item, "zh"))) {
+            printLine("Not Available for Now...", "dim");
+            return;
+          }
+          state.lang = "zh";
+          renderWriting(item);
+        })();
         break;
       }
       case "pwd":
@@ -959,7 +1063,7 @@
           setSection("cv");
           state.currentWritingId = null;
           printLine("moved to /cv", "muted");
-          content.cv.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
+          renderCv();
           break;
         }
         if (["writing", "writting", "writtings", "writings"].includes(target)) {
@@ -997,7 +1101,7 @@
       case "cv":
         setSection("cv");
         state.currentWritingId = null;
-        content.cv.forEach((l) => printLine(l, l.endsWith("_") ? "glow" : undefined));
+        renderCv();
         break;
       case "writing":
       case "writting":
